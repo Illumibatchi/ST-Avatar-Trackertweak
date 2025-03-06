@@ -2,34 +2,34 @@
 const { eventSource } = SillyTavern.getContext();
 
 function updateOrCreateZoomedAvatar(imgSrc) {
-    // Check if the zoomed_avatar div already exists
     let zoomedAvatarDiv = document.querySelector('.zoomed_avatar.draggable');
+    const charName = imgSrc.startsWith('/characters/') 
+        ? imgSrc.split('/').pop().replace('.png', '') 
+        : null;
 
     if (zoomedAvatarDiv) {
-        // If it exists, update the image sources
         let zoomedImage = zoomedAvatarDiv.querySelector('.zoomed_avatar_img');
         if (zoomedImage) {
-            zoomedImage.setAttribute('src', imgSrc);
-            zoomedImage.setAttribute('data-izoomify-url', imgSrc);
+            zoomedImage.src = imgSrc;
+            zoomedImage.dataset.izoomifyUrl = imgSrc;
         }
-        // Also update the 'forchar' and 'id' attributes of the div and control bar
-        zoomedAvatarDiv.setAttribute('forchar', imgSrc);
-        zoomedAvatarDiv.setAttribute('id', `zoomFor_${imgSrc}`);
+        zoomedAvatarDiv.setAttribute('forchar', charName || 'User');
+        zoomedAvatarDiv.id = `zoomFor_${charName || 'User'}`;
+        
         let dragGrabber = zoomedAvatarDiv.querySelector('.drag-grabber');
         if (dragGrabber) {
-            dragGrabber.setAttribute('id', `zoomFor_${imgSrc}header`);
+            dragGrabber.id = `zoomFor_${charName || 'User'}header`;
         }
     } else {
-        // If it doesn't exist, create the HTML structure and append it to the body
         zoomedAvatarDiv = document.createElement('div');
         zoomedAvatarDiv.className = 'zoomed_avatar draggable';
-        zoomedAvatarDiv.setAttribute('forchar', imgSrc);
-        zoomedAvatarDiv.setAttribute('id', `zoomFor_${imgSrc}`);
-        zoomedAvatarDiv.setAttribute('style', 'display: flex;');
+        zoomedAvatarDiv.setAttribute('forchar', charName || 'User');
+        zoomedAvatarDiv.id = `zoomFor_${charName || 'User'}`;
+        zoomedAvatarDiv.style.display = 'flex';
 
         zoomedAvatarDiv.innerHTML = `
             <div class="panelControlBar flex-container">
-                <div class="fa-fw fa-solid fa-grip drag-grabber" id="zoomFor_${imgSrc}header"></div>
+                <div class="fa-fw fa-solid fa-grip drag-grabber" id="zoomFor_${charName || 'User'}header"></div>
                 <div class="fa-fw fa-solid fa-circle-xmark dragClose" id="closeZoom"></div>
             </div>
             <div class="zoomed_avatar_container">
@@ -37,80 +37,55 @@ function updateOrCreateZoomedAvatar(imgSrc) {
             </div>
         `;
 
-        // Append the new div to the body
         document.body.appendChild(zoomedAvatarDiv);
     }
 }
 
 let zoomedAvatarObserver = null;
-// Function to re-add the zoomed_avatar if it gets removed
 function ensureZoomedAvatarExists(imgSrc) {
-    // Disconnect any existing observer
-    if (zoomedAvatarObserver) {
-        zoomedAvatarObserver.disconnect();
-    }
+    if (zoomedAvatarObserver) zoomedAvatarObserver.disconnect();
 
-    // Create a new observer
     zoomedAvatarObserver = new MutationObserver(() => {
         if (!document.querySelector('.zoomed_avatar.draggable')) {
             updateOrCreateZoomedAvatar(imgSrc);
         }
     });
 
-    // Start observing the body for changes
     zoomedAvatarObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-function DefaultZoom() {
-    // Find the last message in the chat
+function getLastMessageAvatar() {
     const lastMessage = document.querySelector('.last_mes');
     if (!lastMessage) {
-        console.error('No last message found.');
-        return;
+        console.error('No messages found');
+        return null;
     }
 
-    // Check who submitted the message using the is_user attribute
-    const isUser = lastMessage.getAttribute('is_user');
-    if (isUser === "true") {
-        // Use the user's avatar from the selected container
-        const selectedAvatar = document.querySelector('.avatar-container.selected');
-        if (selectedAvatar) {
-            const imgElement = selectedAvatar.querySelector('img');
-            if (imgElement) {
-                const imgSrc = imgElement.getAttribute('src');
-                if (imgSrc) {
-                    updateOrCreateZoomedAvatar(imgSrc);
-                    ensureZoomedAvatarExists(imgSrc);
-                } else {
-                    console.error('User avatar image source was null.');
-                }
-            } else {
-                console.error('User avatar image element was null.');
-            }
-        } else {
-            console.error('No selected user avatar container found.');
-        }
-    } else if (isUser === "false") {
-        // Use the character's avatar based on the character name attribute
-        const charName = lastMessage.getAttribute('ch_name');
-        if (charName) {
-            const imgSrc = `/characters/${charName}.png`;
-            try {
-                updateOrCreateZoomedAvatar(imgSrc);
-                ensureZoomedAvatarExists(imgSrc);
-            } catch (e) {
-                console.error('Failed to update character Zoomed Avatar image.', e);
-            }
-        } else {
-            console.error('Character Name not Found.');
-        }
-    } else {
-        console.error('Invalid is_user attribute on last message.');
+    const isUser = lastMessage.getAttribute('is_user') === 'true';
+    
+    if (isUser) {
+        const avatarContainer = document.querySelector('.avatar-container.selected');
+        const img = avatarContainer?.querySelector('img');
+        return img?.src || null;
     }
+    
+    const charName = lastMessage.getAttribute('ch_name');
+    return charName ? `/characters/${charName}.png` : null;
 }
 
-// Update event listeners to trigger DefaultZoom, ensuring the zoomed avatar
-// always reflects the last submitted message (whether by user or character)
-eventSource.on('generation_started', DefaultZoom);
-eventSource.on('generation_ended', DefaultZoom);
-eventSource.on('chat_id_changed', DefaultZoom);
+function updateZoomFromLastMessage() {
+    const imgSrc = getLastMessageAvatar();
+    if (!imgSrc) return;
+
+    updateOrCreateZoomedAvatar(imgSrc);
+    ensureZoomedAvatarExists(imgSrc);
+}
+
+// Update on relevant events
+eventSource.on('generation_started', updateZoomFromLastMessage);
+eventSource.on('generation_ended', updateZoomFromLastMessage);
+eventSource.on('chat_id_changed', updateZoomFromLastMessage);
+eventSource.on('message_swiped', updateZoomFromLastMessage);
+
+// Initial update when script loads
+updateZoomFromLastMessage();
