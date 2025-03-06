@@ -61,107 +61,56 @@ function ensureZoomedAvatarExists(imgSrc) {
     zoomedAvatarObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// Updates the avatar based on the last message's sender.
-// If the last message is from a character, show its avatar;
-// otherwise, use the user avatar.
-function updateAvatar() {
-    // Try to locate the last message element (adjust the selector as needed)
+function DefaultZoom() {
+    // Find the last message in the chat
     const lastMessage = document.querySelector('.last_mes');
-    if (lastMessage) {
-        const isUser = lastMessage.getAttribute('is_user') === "true";
-        if (isUser) {
-            UserZoom();
-        } else {
-            CharZoom();
-        }
-    } else {
-        // Fallback to user avatar if no messages are found
-        UserZoom();
+    if (!lastMessage) {
+        console.error('No last message found.');
+        return;
     }
-}
 
-function UserZoom() {
-    const selectedAvatar = document.querySelector('.avatar-container.selected');
-    // Check if the selected avatar container exists
-    if (selectedAvatar) {
-        // Find the img element inside the selected avatar container
-        const imgElement = selectedAvatar.querySelector('img');
-
-        // Check if the img element exists
-        if (imgElement) {
-            // Get the src attribute from the img element
-            const imgSrc = imgElement.getAttribute('src');
-            if (imgSrc) {
-                console.log("UserZoom triggered with image:", imgSrc);
-                updateOrCreateZoomedAvatar(imgSrc);
-                ensureZoomedAvatarExists(imgSrc);
+    // Check who submitted the message using the is_user attribute
+    const isUser = lastMessage.getAttribute('is_user');
+    if (isUser === "true") {
+        // Use the user's avatar from the selected container
+        const selectedAvatar = document.querySelector('.avatar-container.selected');
+        if (selectedAvatar) {
+            const imgElement = selectedAvatar.querySelector('img');
+            if (imgElement) {
+                const imgSrc = imgElement.getAttribute('src');
+                if (imgSrc) {
+                    updateOrCreateZoomedAvatar(imgSrc);
+                    ensureZoomedAvatarExists(imgSrc);
+                } else {
+                    console.error('User avatar image source was null.');
+                }
             } else {
-                console.error('User avatar image source was null.');
+                console.error('User avatar image element was null.');
             }
         } else {
-            console.error('User avatar image element was null.');
+            console.error('No selected user avatar container found.');
         }
-    } else {
-        console.error('No selected user avatar container found.');
-    }
-}
-
-function CharZoom() {
-    // Grab the last message that is not from the user
-    const lastCharMsg = document.querySelector('.last_mes[is_user="false"]');
-    if (lastCharMsg) {
-        const charName = lastCharMsg.getAttribute('ch_name');
+    } else if (isUser === "false") {
+        // Use the character's avatar based on the character name attribute
+        const charName = lastMessage.getAttribute('ch_name');
         if (charName) {
             const imgSrc = `/characters/${charName}.png`;
             try {
-                console.log("CharZoom triggered with image:", imgSrc);
                 updateOrCreateZoomedAvatar(imgSrc);
                 ensureZoomedAvatarExists(imgSrc);
-            } catch (error) {
-                console.error('Failed to update character Zoomed Avatar image.', error);
+            } catch (e) {
+                console.error('Failed to update character Zoomed Avatar image.', e);
             }
         } else {
             console.error('Character Name not Found.');
         }
     } else {
-        console.error('Last message not sent by a character.');
+        console.error('Invalid is_user attribute on last message.');
     }
 }
 
-// Event triggers
-eventSource.on('generation_started', () => {
-    console.log("generation_started event fired");
-    // When generation starts, assume a character is generating a reply.
-    // Immediately show the character's avatar.
-    CharZoom();
-});
-
-eventSource.on('generation_ended', () => {
-    console.log("generation_ended event fired");
-    // Once generation ends, update based on the last message
-    // (which could be from a character or the user).
-    updateAvatar();
-});
-
-eventSource.on('chat_id_changed', () => {
-    console.log("chat_id_changed event fired");
-    // Update the avatar when switching chats.
-    updateAvatar();
-});
-
-// Custom event trigger: when the user submits something to the chat
-eventSource.on('user_submitted', () => {
-    console.log("user_submitted event fired");
-    // Immediately show the user's avatar when they submit a message.
-    UserZoom();
-});
-
-// Fallback: listen for form submission if the above event isn't firing
-// Replace '#chat-form' with the correct selector for your chat form
-const chatForm = document.querySelector('#chat-form');
-if (chatForm) {
-    chatForm.addEventListener('submit', () => {
-        console.log("Chat form submitted");
-        UserZoom();
-    });
-}
+// Update event listeners to trigger DefaultZoom, ensuring the zoomed avatar
+// always reflects the last submitted message (whether by user or character)
+eventSource.on('generation_started', DefaultZoom);
+eventSource.on('generation_ended', DefaultZoom);
+eventSource.on('chat_id_changed', DefaultZoom);
