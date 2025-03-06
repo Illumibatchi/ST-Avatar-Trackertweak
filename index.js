@@ -1,74 +1,101 @@
 // @ts-ignore
 const { eventSource } = SillyTavern.getContext();
 
-function UserZoom() {
-    console.log('[DEBUG] Starting UserZoom');
-    
-    // 1. Try direct avatar element
-    let imgElement = document.querySelector('#user_avatar img');
-    console.log('[DEBUG] Direct avatar element:', imgElement);
+// 1. CORE FUNCTIONS FIRST
+function updateOrCreateZoomedAvatar(imgSrc) {
+    console.log('[DEBUG] Updating zoomed avatar with:', imgSrc);
+    let zoomedAvatarDiv = document.querySelector('.zoomed_avatar.draggable');
 
-    // 2. Try message-based detection
-    if (!imgElement) {
-        const lastUserMessage = document.querySelector('.mes[is_user="true"]:last-child');
-        if (lastUserMessage) {
-            imgElement = lastUserMessage.querySelector('.avatar img');
-            console.log('[DEBUG] Message-based avatar:', imgElement);
+    if (zoomedAvatarDiv) {
+        let zoomedImage = zoomedAvatarDiv.querySelector('.zoomed_avatar_img');
+        if (zoomedImage) {
+            zoomedImage.src = imgSrc;
+            zoomedImage.dataset.izoomifyUrl = imgSrc;
+        }
+        zoomedAvatarDiv.setAttribute('forchar', imgSrc);
+        zoomedAvatarDiv.id = `zoomFor_${imgSrc}`;
+    } else {
+        zoomedAvatarDiv = document.createElement('div');
+        zoomedAvatarDiv.className = 'zoomed_avatar draggable';
+        zoomedAvatarDiv.innerHTML = `
+            <div class="panelControlBar">
+                <div class="drag-grabber"></div>
+                <div class="dragClose"></div>
+            </div>
+            <div class="zoomed_avatar_container">
+                <img class="zoomed_avatar_img" src="${imgSrc}" 
+                     data-izoomify-url="${imgSrc}" 
+                     alt="Zoomed Avatar">
+            </div>
+        `;
+        document.body.appendChild(zoomedAvatarDiv);
+    }
+}
+
+function ensureZoomedAvatarExists(imgSrc) {
+    const observer = new MutationObserver(() => {
+        if (!document.querySelector('.zoomed_avatar')) {
+            updateOrCreateZoomedAvatar(imgSrc);
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// 2. AVATAR DETECTION FUNCTIONS
+function UserZoom() {
+    console.log('[DEBUG] Executing UserZoom');
+    let imgSrc = null;
+    
+    // Try different avatar locations
+    const avatarSelectors = [
+        '#user_avatar img',
+        '.mes_user .avatar img',
+        '[data-avatar="user"] img',
+        '.avatar-container.selected:not([forchar]) img'
+    ];
+
+    for (const selector of avatarSelectors) {
+        const img = document.querySelector(selector);
+        if (img?.src) {
+            imgSrc = img.src;
+            break;
         }
     }
 
-    // 3. Try profile button
-    if (!imgElement) {
-        const profileButton = document.querySelector('[data-id="profile-button"] img');
-        console.log('[DEBUG] Profile button avatar:', profileButton);
-        imgElement = profileButton;
+    if (!imgSrc) {
+        console.warn('[DEBUG] Using fallback user avatar');
+        imgSrc = '/user.png?' + Date.now();
     }
 
-    let imgSrc = null;
-    if (imgElement && imgElement.src) {
-        imgSrc = imgElement.src;
-        console.log('[DEBUG] Found avatar src:', imgSrc);
-    } else {
-        console.warn('[DEBUG] Using fallback avatar');
-        imgSrc = `/user.png?t=${Date.now()}`;
-    }
-
-    // Force refresh the zoomed avatar
-    const zoomedImage = document.querySelector('.zoomed_avatar_img');
-    if (zoomedImage) {
-        zoomedImage.src = '';
-        zoomedImage.src = imgSrc;
-        console.log('[DEBUG] Forced image reload');
-    }
-    
     updateOrCreateZoomedAvatar(imgSrc);
     ensureZoomedAvatarExists(imgSrc);
 }
 
-// Enhanced event listeners
-eventSource.on('user_submitted', () => {
-    console.log('[DEBUG] user_submitted event received');
-    setTimeout(() => {
-        console.log('[DEBUG] Executing delayed UserZoom');
-        UserZoom();
-    }, 500);
-});
-
-// Mutation Observer for dynamic UI updates
-const observer = new MutationObserver((mutations) => {
-    mutations.forEach(mutation => {
-        if (mutation.addedNodes.length) {
-            Array.from(mutation.addedNodes).forEach(node => {
-                if (node.classList && node.classList.contains('mes')) {
-                    console.log('[DEBUG] New message detected');
-                    UserZoom();
-                }
-            });
-        }
+// 3. EVENT HANDLERS
+function initAvatarTracking() {
+    // Core events
+    eventSource.on('user_submitted', () => {
+        console.log('[DEBUG] User submitted message');
+        setTimeout(UserZoom, 300);
     });
-});
 
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+    eventSource.on('generation_started', () => {
+        console.log('[DEBUG] Generation started');
+        // Your existing CharZoom logic here
+    });
+
+    // Mutation observer for dynamic content
+    new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length > 0) {
+                UserZoom();
+            }
+        });
+    }).observe(document.getElementById('chat'), {
+        childList: true,
+        subtree: true
+    });
+}
+
+// 4. INITIALIZATION
+initAvatarTracking();
