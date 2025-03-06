@@ -1,10 +1,10 @@
 {
-  "display_name": "Avatar Zoom Tracker",
+  "display_name": "Avatar Zoom TrackerTweak",
   "requires": [],
   "optional": [],
   "js": "index.js",
-  "author": "Happydragoon",
-  "version": "2.0.0",
-  "homePage": "https://github.com/Happydragun4now/ST-Avatar-Tracker",
+  "author": "Happydragoon+Lefty",
+  "version": "2.0.1",
+  "homePage": "https://github.com/Illumibatchi/ST-Avatar-Trackertweak",
   "auto_update": true
 }
