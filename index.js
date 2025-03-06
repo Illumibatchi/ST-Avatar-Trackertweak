@@ -3,13 +3,13 @@ const { eventSource } = SillyTavern.getContext();
 
 function updateOrCreateZoomedAvatar(imgSrc) {
     let zoomedAvatarDiv = document.querySelector('.zoomed_avatar.draggable');
-    const charName = imgSrc.startsWith('/characters/') 
+    const charName = imgSrc?.startsWith('/characters/') 
         ? imgSrc.split('/').pop().replace('.png', '') 
         : null;
 
     if (zoomedAvatarDiv) {
         let zoomedImage = zoomedAvatarDiv.querySelector('.zoomed_avatar_img');
-        if (zoomedImage) {
+        if (zoomedImage && imgSrc) {
             zoomedImage.src = imgSrc;
             zoomedImage.dataset.izoomifyUrl = imgSrc;
         }
@@ -20,7 +20,7 @@ function updateOrCreateZoomedAvatar(imgSrc) {
         if (dragGrabber) {
             dragGrabber.id = `zoomFor_${charName || 'User'}header`;
         }
-    } else {
+    } else if (imgSrc) {
         zoomedAvatarDiv = document.createElement('div');
         zoomedAvatarDiv.className = 'zoomed_avatar draggable';
         zoomedAvatarDiv.setAttribute('forchar', charName || 'User');
@@ -46,7 +46,7 @@ function ensureZoomedAvatarExists(imgSrc) {
     if (zoomedAvatarObserver) zoomedAvatarObserver.disconnect();
 
     zoomedAvatarObserver = new MutationObserver(() => {
-        if (!document.querySelector('.zoomed_avatar.draggable')) {
+        if (!document.querySelector('.zoomed_avatar.draggable') && imgSrc) {
             updateOrCreateZoomedAvatar(imgSrc);
         }
     });
@@ -56,36 +56,12 @@ function ensureZoomedAvatarExists(imgSrc) {
 
 function getLastMessageAvatar() {
     const lastMessage = document.querySelector('.last_mes');
-    if (!lastMessage) {
-        console.error('No messages found');
-        return null;
+    if (!lastMessage) return null;
+
+    // Try to find avatar directly in the message
+    const messageAvatar = lastMessage.querySelector('.avatar img');
+    if (messageAvatar) {
+        return messageAvatar.src;
     }
 
-    const isUser = lastMessage.getAttribute('is_user') === 'true';
-    
-    if (isUser) {
-        const avatarContainer = document.querySelector('.avatar-container.selected');
-        const img = avatarContainer?.querySelector('img');
-        return img?.src || null;
-    }
-    
-    const charName = lastMessage.getAttribute('ch_name');
-    return charName ? `/characters/${charName}.png` : null;
-}
-
-function updateZoomFromLastMessage() {
-    const imgSrc = getLastMessageAvatar();
-    if (!imgSrc) return;
-
-    updateOrCreateZoomedAvatar(imgSrc);
-    ensureZoomedAvatarExists(imgSrc);
-}
-
-// Update on relevant events
-eventSource.on('generation_started', updateZoomFromLastMessage);
-eventSource.on('generation_ended', updateZoomFromLastMessage);
-eventSource.on('chat_id_changed', updateZoomFromLastMessage);
-eventSource.on('message_swiped', updateZoomFromLastMessage);
-
-// Initial update when script loads
-updateZoomFromLastMessage();
+    const isUser = lastMessage.getAttribute('is_user')
