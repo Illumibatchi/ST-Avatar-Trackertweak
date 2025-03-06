@@ -41,6 +41,7 @@ function updateOrCreateZoomedAvatar(imgSrc) {
         document.body.appendChild(zoomedAvatarDiv);
     }
 }
+
 let zoomedAvatarObserver = null;
 // Function to re-add the zoomed_avatar if it gets removed
 function ensureZoomedAvatarExists(imgSrc) {
@@ -72,9 +73,8 @@ function UserZoom() {
             // Get the src attribute from the img element
             const imgSrc = imgElement.getAttribute('src');
             if (imgSrc) {
-                //Do stuff with the imgSrc
                 updateOrCreateZoomedAvatar(imgSrc);
-                ensureZoomedAvatarExists(imgSrc)
+                ensureZoomedAvatarExists(imgSrc);
             } else {
                 console.error('User avatar image source was null.');
             }
@@ -87,7 +87,7 @@ function UserZoom() {
 }
 
 function CharZoom() {
-    //this will work if it's the last message, but what if it's not?
+    // This will work if it's the last message, but what if it's not?
     const lastCharMsg = document.querySelector('.last_mes[is_user="false"]');
     if (lastCharMsg) {
         const charName = lastCharMsg.getAttribute('ch_name');
@@ -95,7 +95,7 @@ function CharZoom() {
             const imgSrc = `/characters/${charName}.png`;
             try {
                 updateOrCreateZoomedAvatar(imgSrc);
-                ensureZoomedAvatarExists(imgSrc)
+                ensureZoomedAvatarExists(imgSrc);
             } catch {
                 console.error('Failed to update character Zoomed Avatar image.');
             }
@@ -107,8 +107,29 @@ function CharZoom() {
     }
 }
 
-//Triggers to change Avatar at automatic times.
-eventSource.on('generation_started', CharZoom);
-eventSource.on('generation_ended', UserZoom);
-eventSource.on('chat_id_changed', UserZoom);
+// Flag to track whether text generation is in progress
+let isGenerating = false;
 
+// Unified function to update the current avatar based on generation state
+function updateCurrentAvatar() {
+    if (isGenerating) {
+        CharZoom();
+    } else {
+        UserZoom();
+    }
+}
+
+// Update avatar when text generation starts
+eventSource.on('generation_started', () => {
+    isGenerating = true;
+    updateCurrentAvatar();
+});
+
+// Update avatar when text generation ends
+eventSource.on('generation_ended', () => {
+    isGenerating = false;
+    updateCurrentAvatar();
+});
+
+// Also update avatar when the chat context changes
+eventSource.on('chat_id_changed', updateCurrentAvatar);
