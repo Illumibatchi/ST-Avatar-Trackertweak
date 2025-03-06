@@ -143,3 +143,9 @@ eventSource.on('chat_id_changed', () => {
     // Update the avatar when switching chats.
     updateAvatar();
 });
+
+// New event trigger: when the user submits something to the chat
+eventSource.on('user_submitted', () => {
+    // Immediately show the user's avatar when they submit a message.
+    UserZoom();
+});
