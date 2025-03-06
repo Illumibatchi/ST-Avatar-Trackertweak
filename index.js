@@ -92,6 +92,7 @@ function UserZoom() {
             // Get the src attribute from the img element
             const imgSrc = imgElement.getAttribute('src');
             if (imgSrc) {
+                console.log("UserZoom triggered with image:", imgSrc);
                 updateOrCreateZoomedAvatar(imgSrc);
                 ensureZoomedAvatarExists(imgSrc);
             } else {
@@ -113,10 +114,11 @@ function CharZoom() {
         if (charName) {
             const imgSrc = `/characters/${charName}.png`;
             try {
+                console.log("CharZoom triggered with image:", imgSrc);
                 updateOrCreateZoomedAvatar(imgSrc);
                 ensureZoomedAvatarExists(imgSrc);
-            } catch {
-                console.error('Failed to update character Zoomed Avatar image.');
+            } catch (error) {
+                console.error('Failed to update character Zoomed Avatar image.', error);
             }
         } else {
             console.error('Character Name not Found.');
@@ -128,24 +130,38 @@ function CharZoom() {
 
 // Event triggers
 eventSource.on('generation_started', () => {
+    console.log("generation_started event fired");
     // When generation starts, assume a character is generating a reply.
     // Immediately show the character's avatar.
     CharZoom();
 });
 
 eventSource.on('generation_ended', () => {
+    console.log("generation_ended event fired");
     // Once generation ends, update based on the last message
     // (which could be from a character or the user).
     updateAvatar();
 });
 
 eventSource.on('chat_id_changed', () => {
+    console.log("chat_id_changed event fired");
     // Update the avatar when switching chats.
     updateAvatar();
 });
 
-// New event trigger: when the user submits something to the chat
+// Custom event trigger: when the user submits something to the chat
 eventSource.on('user_submitted', () => {
+    console.log("user_submitted event fired");
     // Immediately show the user's avatar when they submit a message.
     UserZoom();
 });
+
+// Fallback: listen for form submission if the above event isn't firing
+// Replace '#chat-form' with the correct selector for your chat form
+const chatForm = document.querySelector('#chat-form');
+if (chatForm) {
+    chatForm.addEventListener('submit', () => {
+        console.log("Chat form submitted");
+        UserZoom();
+    });
+}
